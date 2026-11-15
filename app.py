@@ -22,7 +22,7 @@ from PIL import Image
 ROBOFLOW_MODEL_ID = "concrete-crack-detection-r584t/1"
 
 # (b) Güven eşiği (0-1 arası)
-GUVEN_ESIGI = 0.50
+GUVEN_ESIGI = 0.15
 
 # (c) Çatlak yoğunluğu kuralı
 def kural_ogrenci(detections, yukseklik, genislik):
