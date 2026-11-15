@@ -19,7 +19,7 @@ from PIL import Image
 # ======================================================================
 
 # (a) Roboflow model kimliği
-ROBOFLOW_MODEL_ID = "concrete-crack-detection-r584t/1"
+ROBOFLOW_MODEL_ID = "crack-detection-ol3yi/1"
 
 # (b) Güven eşiği (0-1 arası)
 GUVEN_ESIGI = 0.15
