@@ -114,7 +114,7 @@ def tespit_et(image_bgr):
     anahtar = api_anahtari()
     if not anahtar:
         raise RuntimeError("ROBOFLOW_API_KEY bulunamadı. Streamlit 'Secrets' bölümüne ekleyin.")
-    client = InferenceHTTPClient(api_url="https://serverless.roboflow.com", api_key=anahtar)
+    client = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=anahtar)
     sorgu = InferenceConfiguration(confidence_threshold=GUVEN_ESIGI, api_key_transport="header")
     with client.use_configuration(sorgu):
         sonuc = client.infer(image_bgr, model_id=ROBOFLOW_MODEL_ID)
