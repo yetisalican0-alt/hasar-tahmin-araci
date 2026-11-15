@@ -187,6 +187,10 @@ except Exception as e:
 
 # --- Kenar çubuğu: model bilgisi --------------------------------------
 with st.sidebar:
+    st.markdown("### 👨‍🎓 Öğrenci Bilgileri")
+    st.write("**Ad Soyad:** ALİCAN YETİŞ")
+    st.write("**Okul No:** 2022232079")
+    st.markdown("---")
     st.header("Model performansı")
     m = meta["metrikler"]
     st.metric("Test doğruluğu", f"{m['test_dogrulugu']:.3f}")
