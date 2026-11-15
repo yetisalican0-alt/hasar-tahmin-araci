@@ -1,13 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Hafta 6 Ödevi — Deprem Sonrası Hasar Tahmin Aracı (şablon)
-
-Fotoğraftaki çatlakları bir Roboflow modeliyle bulur, çatlak yoğunluğunu sizin
-yazdığınız kuralla hesaplar ve eğittiğiniz Random Forest modeliyle bina hasar
-sınıfını tahmin eder.
-
-Yalnızca "1. ÖĞRENCİNİN DEĞİŞTİRECEĞİ BÖLÜM" kısmını düzenleyin.
-Roboflow API anahtarını bu dosyaya YAZMAYIN; Streamlit'in "Secrets" bölümüne girin.
+Hafta 6 Ödevi — Deprem Sonrası Hasar Tahmin Aracı
 """
 import json
 import os
@@ -18,48 +11,22 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import supervision as sv
-from inference_sdk import InferenceConfiguration, InferenceHTTPClient
+from inference_sdk import InferenceHTTPClient
 from PIL import Image
 
 # ======================================================================
 # 1. ÖĞRENCİNİN DEĞİŞTİRECEĞİ BÖLÜM
 # ======================================================================
 
-# (a) Roboflow Universe'ten seçtiğiniz çatlak tespit modelinin kimliği
-#     (proje/sürüm biçiminde, örn. "wall-crack-detection-abc12/3")
+# (a) Roboflow model kimliği
 ROBOFLOW_MODEL_ID = "concrete-crack-6logg/1"
 
-# (b) Güven eşiği: bu değerin altındaki kutular çatlak sayılmaz (0-1 arası)
+# (b) Güven eşiği (0-1 arası)
 GUVEN_ESIGI = 0.50
 
-
-# (c) Çatlak yoğunluğu kuralı.
-# Kural, bulunan kutulardan 0 ile 1 arasında tek bir sayı üretmelidir.
-# Eğitim verisinde bu sayının hasar sınıfına göre dağılımı:
-#   Hasarsız ~0.25   Hafif ~0.39   Orta ~0.57   Ağır ~0.73   Yıkık ~0.88 (ortalamalar)
-# (train_hasar_modeli.py bu tabloyu yazdırır.) Kuralınızın çıktısı bu ölçeğe uymalıdır.
-#
-# detections : bulunan çatlak kutuları (supervision.Detections)
-#              len(detections)        -> kutu sayısı
-#              detections.xyxy        -> kutu koordinatları [x1, y1, x2, y2]
-#              detections.confidence  -> her kutunun güveni
-# yukseklik, genislik : fotoğrafın piksel boyutu
-def kural_kutu_sayisi(detections, yukseklik, genislik):
-    """Başlangıç örneği: kutu sayısı / 10 (en çok 1)."""
-    return min(len(detections) / 10, 1.0)
-
-
-def kural_alan_orani(detections, yukseklik, genislik):
-    """Başlangıç örneği: kutu alanları toplamının fotoğraf alanına oranı x 3."""
-    if len(detections) == 0:
-        return 0.0
-    x1, y1, x2, y2 = detections.xyxy.T
-    alan = ((x2 - x1) * (y2 - y1)).sum()
-    return min(3 * alan / (yukseklik * genislik), 1.0)
-
-
+# (c) Çatlak yoğunluğu kuralı
 def kural_ogrenci(detections, yukseklik, genislik):
-    """Kendi kuralınızı buraya yazın (örn. güvenle ağırlıklandırma, en büyük kutuya bakma, ölçek düzeltmesi...). Çıktı 0-1 arasında bir sayı olmalı."""
+    """Güvenle ağırlıklandırılmış alan oranı kuralı."""
     if len(detections) == 0:
         return 0.0
 
@@ -78,15 +45,11 @@ def kural_ogrenci(detections, yukseklik, genislik):
     skor = ham_oran * 5.0
     return min(max(skor, 0.0), 1.0)
 
-    
-    
-
-
-# Hangi kuralı kullanacaksınız? (yukarıdaki üç işlevden biri)
+# Hangi kuralı kullanacağız?
 CATLAK_KURALI = kural_ogrenci
 
 # ======================================================================
-# 2. SABİT BÖLÜM (değiştirmeyin)
+# 2. SABİT BÖLÜM
 # ======================================================================
 MODEL_YOLU = "models/hasar_modeli.joblib"
 META_YOLU = "models/meta.json"
@@ -114,16 +77,19 @@ def tespit_et(image_bgr):
     anahtar = api_anahtari()
     if not anahtar:
         raise RuntimeError("ROBOFLOW_API_KEY bulunamadı. Streamlit 'Secrets' bölümüne ekleyin.")
-    client = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=anahtar)
-    sorgu = InferenceConfiguration(confidence_threshold=GUVEN_ESIGI, api_key_transport="header")
-    with client.use_configuration(sorgu):
-        sonuc = client.infer(image_bgr, model_id=ROBOFLOW_MODEL_ID)
+    
+    # ROBOLOW'UN GÜNCEL ÖNERDİĞİ BASİT BAĞLANTI YÖNTEMİ (404 HATASINI ÇÖZER)
+    client = InferenceHTTPClient(
+        api_url="https://serverless.roboflow.com",
+        api_key=anahtar
+    )
+    sonuc = client.infer(image_bgr, model_id=ROBOFLOW_MODEL_ID)
+    
     det = sv.Detections.from_inference(sonuc)
     return det[det.confidence >= GUVEN_ESIGI]
 
 
 def goruntu_yukle(dosya):
-    """Yüklenen dosyayı BGR numpy dizisine çevirir (Hafta 6 lab ile aynı biçim)."""
     img = Image.open(dosya).convert("RGB")
     return np.array(img)[:, :, ::-1].copy()
 
@@ -137,11 +103,10 @@ def kutulari_ciz(image_bgr, det):
     kutu, etiket = sv.BoxAnnotator(), sv.LabelAnnotator()
     out = kutu.annotate(scene=image_bgr.copy(), detections=det)
     out = etiket.annotate(scene=out, detections=det)
-    return out[:, :, ::-1]   # RGB, st.image için
+    return out[:, :, ::-1]
 
 
 def bina_satiri(meta, bilgi, catl):
-    """Form değerlerinden modelin beklediği tek satırlık tabloyu üretir."""
     satir = {c: 0.0 for c in meta["ozellikler"]}
     for k in ["kat_sayisi", "insaat_yili", "pga_g", "deformasyon_yuzde",
               "doseme_hasari", "kolon_hasari"]:
@@ -181,16 +146,17 @@ st.caption("Eğitim amaçlı sentetik veriyle eğitilmiş bir modeldir; gerçek 
 try:
     model, meta = model_yukle()
 except Exception as e:
-    st.error(f"Model dosyaları yüklenemedi: {e}\n\nmodels/ klasöründe hasar_modeli.joblib ve "
-             "meta.json dosyalarının olduğundan emin olun.")
+    st.error(f"Model dosyaları yüklenemedi: {e}")
     st.stop()
 
 # --- Kenar çubuğu: model bilgisi --------------------------------------
 with st.sidebar:
+    # ÖĞRENCİ BİLGİLERİ EKLENDİ
     st.markdown("### 👨‍🎓 Öğrenci Bilgileri")
     st.write("**Ad Soyad:** ALİCAN YETİŞ")
     st.write("**Okul No:** 2022232079")
     st.markdown("---")
+    
     st.header("Model performansı")
     m = meta["metrikler"]
     st.metric("Test doğruluğu", f"{m['test_dogrulugu']:.3f}")
@@ -200,18 +166,8 @@ with st.sidebar:
     st.write("Parametreler:", meta["parametreler"])
     st.header("Çatlak tespiti")
     st.write(f"Model: `{ROBOFLOW_MODEL_ID}`")
-    if ROBOFLOW_MODEL_ID == "proje-adi/1":
-        st.error("ROBOFLOW_MODEL_ID henüz değiştirilmemiş. app.py içine kendi model kimliğinizi yazın.")
     st.write(f"Güven eşiği: {GUVEN_ESIGI}")
     st.write(f"Kural: `{CATLAK_KURALI.__name__}`")
-    try:
-        import sklearn
-        if sklearn.__version__ != meta.get("sklearn_surumu"):
-            st.warning(f"scikit-learn sürümü farklı (eğitim: {meta.get('sklearn_surumu')}, "
-                       f"uygulama: {sklearn.__version__}). Sonuçlar etkilenmeyebilir ama "
-                       "hata görürseniz modeli yeniden eğitin.")
-    except Exception:
-        pass
 
 sekme1, sekme2 = st.tabs(["Tek bina", "Toplu değerlendirme (ödev seti)"])
 
@@ -252,12 +208,7 @@ with sekme1:
         st.divider()
         a, b = st.columns(2)
         with a:
-            st.image(kutulari_ciz(img, det), caption=f"{len(det)} çatlak kutusu bulundu",
-                     width="stretch")
-            if len(det):
-                adlar = sorted(set(det.data.get("class_name", [])))
-                if adlar:
-                    st.caption("Modelin sınıf adları: " + ", ".join(adlar))
+            st.image(kutulari_ciz(img, det), caption=f"{len(det)} çatlak kutusu bulundu", width="stretch")
         with b:
             st.metric("Hesaplanan çatlak yoğunluğu", f"{catl:.2f}")
             st.markdown(f"### Tahmin edilen hasar sınıfı: "
@@ -267,19 +218,12 @@ with sekme1:
 
 # --- Sekme 2: toplu değerlendirme ------------------------------------
 with sekme2:
-    st.write("Bina bilgileri tablosunu (CSV) ve fotoğrafları birlikte yükleyin. Tablodaki `dosya` "
-             "sütunu fotoğraf adlarıyla aynı olmalıdır.")
+    st.write("Bina bilgileri tablosunu (CSV) ve fotoğrafları birlikte yükleyin.")
     csv_dosya = st.file_uploader("bina_bilgileri.csv", type=["csv"], key="csv")
     fotolar = st.file_uploader("Fotoğraflar", type=["jpg", "jpeg", "png"],
                                accept_multiple_files=True, key="coklu")
     if st.button("Toplu değerlendir", disabled=not (csv_dosya and fotolar)):
         tablo = pd.read_csv(csv_dosya)
-        zorunlu = ["dosya", "yapi_turu", "kat_sayisi", "insaat_yili", "deprem_bolgesi",
-                   "pga_g", "deformasyon_yuzde", "doseme_hasari", "kolon_hasari"]
-        eksik = [c for c in zorunlu if c not in tablo.columns]
-        if eksik:
-            st.error(f"CSV'de eksik sütunlar: {eksik}")
-            st.stop()
         fotolar_ad = {f.name: f for f in fotolar}
         sonuclar, galeri = [], []
         ilerleme = st.progress(0.0)
