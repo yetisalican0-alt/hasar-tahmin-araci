@@ -59,37 +59,27 @@ def kural_alan_orani(detections, yukseklik, genislik):
 
 
 def kural_ogrenci(detections, yukseklik, genislik):
-    """Kendi kuralınızı buraya yazın (örn. güvenle ağırlıklandırma, en büyük
-    kutuya bakma, ölçek düzeltmesi...). Çıktı 0-1 arasında bir sayı olmalı."""
-    def kural_ogrenci(detections, yukseklik, genislik):
+    """Kendi kuralınızı buraya yazın (örn. güvenle ağırlıklandırma, en büyük kutuya bakma, ölçek düzeltmesi...). Çıktı 0-1 arasında bir sayı olmalı."""
     if len(detections) == 0:
         return 0.0
 
-    # Kutuların koordinatlarını ve güven skorlarını al
     x1 = detections.xyxy[:, 0]
     y1 = detections.xyxy[:, 1]
     x2 = detections.xyxy[:, 2]
     y2 = detections.xyxy[:, 3]
     guven = detections.confidence
 
-    # Her bir kutunun alanını hesapla
     kutularin_alanlari = (x2 - x1) * (y2 - y1)
-    
-    # Alanı, modelin o kutuya olan güveniyle çarp (Güvenle ağırlıklandırma)
     agirlikli_alan = (kutularin_alanlari * guven).sum()
 
-    # Fotoğrafın toplam alanı
     resim_alani = yukseklik * genislik
-
-    # Ham oran (0-1 arası çok küçük bir değer çıkar)
     ham_oran = agirlikli_alan / resim_alani
 
-    # Eğitim verisindeki ortalamalara (0.25 - 0.88) çekmek için katsayı
-    # Çatlaklar ince olduğu için bu katsayıyı 5.0 olarak belirledik.
     skor = ham_oran * 5.0
-
-    # Sonucun her zaman 0 ile 1 arasında kalmasını sağla
     return min(max(skor, 0.0), 1.0)
+
+    
+    
 
 
 # Hangi kuralı kullanacaksınız? (yukarıdaki üç işlevden biri)
